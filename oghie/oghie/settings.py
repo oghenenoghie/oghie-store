@@ -12,6 +12,9 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 
 from pathlib import Path
 
+from django.urls import reverse_lazy
+from django.utils.translation import gettext_lazy as _
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -31,6 +34,10 @@ ALLOWED_HOSTS = ['127.0.0.1', 'localhost']
 # Application definition
 
 INSTALLED_APPS = [
+    'unfold',
+    'unfold.contrib.filters',
+    'unfold.contrib.forms',
+    'unfold.contrib.inlines',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -44,6 +51,175 @@ INSTALLED_APPS = [
     'payments',
     'cms',
 ]
+
+UNFOLD = {
+    'SITE_TITLE': _('Oghie Store Admin'),
+    'SITE_HEADER': _('Oghie Store'),
+    'SITE_SUBHEADER': _('Super admin console'),
+    'SITE_SYMBOL': 'storefront',
+    'SITE_URL': '/',
+    'SHOW_HISTORY': True,
+    'SHOW_VIEW_ON_SITE': False,
+    'SHOW_BACK_BUTTON': True,
+    'BORDER_RADIUS': '6px',
+    'COLORS': {
+        'primary': {
+            '50': '#ecfdf5',
+            '100': '#d1fae5',
+            '200': '#a7f3d0',
+            '300': '#6ee7b7',
+            '400': '#34d399',
+            '500': '#10b981',
+            '600': '#059669',
+            '700': '#047857',
+            '800': '#065f46',
+            '900': '#064e3b',
+            '950': '#022c22',
+        },
+    },
+    'SIDEBAR': {
+        'show_search': True,
+        'show_all_applications': False,
+        'navigation': [
+            {
+                'title': _('Overview'),
+                'separator': False,
+                'items': [
+                    {
+                        'title': _('Dashboard'),
+                        'icon': 'dashboard',
+                        'link': reverse_lazy('admin:index'),
+                        'permission': lambda request: request.user.is_superuser,
+                    },
+                    {
+                        'title': _('Analytics API'),
+                        'icon': 'monitoring',
+                        'link': '/api/analytics/summary/',
+                        'permission': lambda request: request.user.is_superuser,
+                    },
+                ],
+            },
+            {
+                'title': _('Commerce'),
+                'separator': True,
+                'collapsible': False,
+                'items': [
+                    {
+                        'title': _('Products'),
+                        'icon': 'inventory_2',
+                        'link': reverse_lazy('admin:products_product_changelist'),
+                        'permission': lambda request: request.user.is_superuser,
+                    },
+                    {
+                        'title': _('Categories'),
+                        'icon': 'category',
+                        'link': reverse_lazy('admin:products_category_changelist'),
+                        'permission': lambda request: request.user.is_superuser,
+                    },
+                    {
+                        'title': _('Currencies'),
+                        'icon': 'payments',
+                        'link': reverse_lazy('admin:products_currency_changelist'),
+                        'permission': lambda request: request.user.is_superuser,
+                    },
+                    {
+                        'title': _('Coupons'),
+                        'icon': 'local_offer',
+                        'link': reverse_lazy('admin:orders_coupon_changelist'),
+                        'permission': lambda request: request.user.is_superuser,
+                    },
+                ],
+            },
+            {
+                'title': _('Fulfillment'),
+                'separator': True,
+                'collapsible': False,
+                'items': [
+                    {
+                        'title': _('Orders'),
+                        'icon': 'receipt_long',
+                        'link': reverse_lazy('admin:orders_order_changelist'),
+                        'permission': lambda request: request.user.is_superuser,
+                    },
+                    {
+                        'title': _('Carts'),
+                        'icon': 'shopping_cart',
+                        'link': reverse_lazy('admin:orders_cart_changelist'),
+                        'permission': lambda request: request.user.is_superuser,
+                    },
+                    {
+                        'title': _('Tracking Events'),
+                        'icon': 'local_shipping',
+                        'link': reverse_lazy('admin:orders_ordertrackingevent_changelist'),
+                        'permission': lambda request: request.user.is_superuser,
+                    },
+                    {
+                        'title': _('Payments'),
+                        'icon': 'credit_card',
+                        'link': reverse_lazy('admin:payments_payment_changelist'),
+                        'permission': lambda request: request.user.is_superuser,
+                    },
+                ],
+            },
+            {
+                'title': _('Content'),
+                'separator': True,
+                'collapsible': False,
+                'items': [
+                    {
+                        'title': _('CMS Sections'),
+                        'icon': 'web',
+                        'link': reverse_lazy('admin:cms_cmssection_changelist'),
+                        'permission': lambda request: request.user.is_superuser,
+                    },
+                    {
+                        'title': _('Product Images'),
+                        'icon': 'image',
+                        'link': reverse_lazy('admin:products_productimage_changelist'),
+                        'permission': lambda request: request.user.is_superuser,
+                    },
+                    {
+                        'title': _('Reviews'),
+                        'icon': 'reviews',
+                        'link': reverse_lazy('admin:products_productreview_changelist'),
+                        'permission': lambda request: request.user.is_superuser,
+                    },
+                    {
+                        'title': _('Wishlists'),
+                        'icon': 'favorite',
+                        'link': reverse_lazy('admin:products_wishlistitem_changelist'),
+                        'permission': lambda request: request.user.is_superuser,
+                    },
+                ],
+            },
+            {
+                'title': _('Access'),
+                'separator': True,
+                'collapsible': False,
+                'items': [
+                    {
+                        'title': _('Users'),
+                        'icon': 'group',
+                        'link': reverse_lazy('admin:auth_user_changelist'),
+                        'permission': lambda request: request.user.is_superuser,
+                    },
+                    {
+                        'title': _('Groups'),
+                        'icon': 'admin_panel_settings',
+                        'link': reverse_lazy('admin:auth_group_changelist'),
+                        'permission': lambda request: request.user.is_superuser,
+                    },
+                    {
+                        'title': _('Profiles'),
+                        'icon': 'badge',
+                        'link': reverse_lazy('admin:users_userprofile_changelist'),
+                        'permission': lambda request: request.user.is_superuser,
+                    },
+                ],
+            },
+        ],
+    },
+}
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
