@@ -1,3 +1,4 @@
+from django.db.models import Avg, Count, Q
 from rest_framework import filters, viewsets
 from rest_framework.permissions import IsAuthenticated, IsAuthenticatedOrReadOnly
 
@@ -35,7 +36,10 @@ class CategoryViewSet(viewsets.ModelViewSet):
 
 
 class ProductViewSet(viewsets.ModelViewSet):
-    queryset = Product.objects.select_related('category').prefetch_related('images')
+    queryset = Product.objects.select_related('category', 'currency').prefetch_related('images').annotate(
+        avg_rating=Avg('reviews__rating', filter=Q(reviews__status=ProductReview.Status.APPROVED)),
+        approved_review_count=Count('reviews', filter=Q(reviews__status=ProductReview.Status.APPROVED)),
+    )
     serializer_class = ProductSerializer
     permission_classes = [IsAdminOrReadOnly]
     lookup_field = 'slug'

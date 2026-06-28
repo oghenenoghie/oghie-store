@@ -1,3 +1,4 @@
+from django.db.models import Avg, Count, Q
 from rest_framework import serializers
 
 from .models import Category, Currency, Product, ProductImage, ProductReview, WishlistItem
@@ -80,13 +81,15 @@ class ProductSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'created_at', 'updated_at']
 
     def get_average_rating(self, obj):
-        approved_reviews = obj.reviews.filter(status=ProductReview.Status.APPROVED)
-        if not approved_reviews.exists():
-            return None
-        total = sum(review.rating for review in approved_reviews)
-        return round(total / approved_reviews.count(), 2)
+        # Uses annotated value from queryset when available (avoids per-object DB hit)
+        if hasattr(obj, 'avg_rating'):
+            return round(obj.avg_rating, 2) if obj.avg_rating is not None else None
+        result = obj.reviews.filter(status=ProductReview.Status.APPROVED).aggregate(avg=Avg('rating'))['avg']
+        return round(result, 2) if result is not None else None
 
     def get_review_count(self, obj):
+        if hasattr(obj, 'approved_review_count'):
+            return obj.approved_review_count
         return obj.reviews.filter(status=ProductReview.Status.APPROVED).count()
 
 

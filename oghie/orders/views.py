@@ -1,8 +1,10 @@
+import uuid
 from decimal import Decimal
 
 from django.db import transaction
-from django.db.models import Count, Sum
-from django.utils.crypto import get_random_string
+from django.db.models import Count, Q, Sum
+from django.db.models.functions import TruncDate
+from django.utils import timezone
 from rest_framework import filters, viewsets
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAdminUser, IsAuthenticated
@@ -101,19 +103,46 @@ class CartViewSet(viewsets.ModelViewSet):
             return Response({'detail': 'Cart is empty.'}, status=400)
 
         with transaction.atomic():
-            subtotal = sum((item.product.price * item.quantity for item in cart.items.select_related('product')), Decimal('0.00'))
-            discount_total = Decimal('0.00')
+            # Validate coupon before applying
+            coupon = None
             if cart.coupon:
-                if cart.coupon.discount_type == Coupon.DiscountType.PERCENT:
-                    discount_total = subtotal * cart.coupon.discount_value / Decimal('100')
+                c = cart.coupon
+                now = timezone.now()
+                if (
+                    c.is_active
+                    and (c.starts_at is None or c.starts_at <= now)
+                    and (c.expires_at is None or c.expires_at >= now)
+                    and (c.usage_limit is None or c.used_count < c.usage_limit)
+                ):
+                    coupon = c
                 else:
-                    discount_total = min(cart.coupon.discount_value, subtotal)
+                    return Response({'detail': 'Coupon is no longer valid.'}, status=400)
+
+            # Fetch cart items once and lock for stock update
+            items = list(cart.items.select_related('product').select_for_update())
+
+            # Validate stock and compute subtotal
+            subtotal = Decimal('0.00')
+            for item in items:
+                if item.product.stock_quantity < item.quantity:
+                    return Response(
+                        {'detail': f'Insufficient stock for "{item.product.name}".'},
+                        status=400,
+                    )
+                subtotal += item.product.price * item.quantity
+
+            discount_total = Decimal('0.00')
+            if coupon:
+                if coupon.discount_type == Coupon.DiscountType.PERCENT:
+                    discount_total = subtotal * coupon.discount_value / Decimal('100')
+                else:
+                    discount_total = min(coupon.discount_value, subtotal)
 
             order = Order.objects.create(
                 customer=request.user,
-                order_number=f'OGH-{get_random_string(10).upper()}',
+                order_number=f'OGH-{uuid.uuid4().hex[:12].upper()}',
                 status=Order.Status.PENDING,
-                coupon=cart.coupon,
+                coupon=coupon,
                 currency=cart.currency,
                 subtotal=subtotal,
                 discount_total=discount_total,
@@ -123,15 +152,27 @@ class CartViewSet(viewsets.ModelViewSet):
                 notes=serializer.validated_data.get('notes', ''),
             )
 
-            for item in cart.items.select_related('product'):
-                OrderItem.objects.create(
+            order_items = []
+            stock_updates = []
+            for item in items:
+                order_items.append(OrderItem(
                     order=order,
                     product=item.product,
                     product_name=item.product.name,
                     unit_price=item.product.price,
                     quantity=item.quantity,
                     line_total=item.product.price * item.quantity,
-                )
+                ))
+                item.product.stock_quantity -= item.quantity
+                stock_updates.append(item.product)
+
+            OrderItem.objects.bulk_create(order_items)
+
+            from products.models import Product as ProductModel
+            ProductModel.objects.bulk_update(stock_updates, ['stock_quantity'])
+
+            if coupon:
+                Coupon.objects.filter(pk=coupon.pk).update(used_count=coupon.used_count + 1)
 
             OrderTrackingEvent.objects.create(
                 order=order,
@@ -152,8 +193,9 @@ class CartItemViewSet(viewsets.ModelViewSet):
         return CartItem.objects.select_related('cart', 'product').filter(cart__user=self.request.user, cart__is_active=True)
 
     def perform_create(self, serializer):
-        cart, _ = Cart.objects.get_or_create(user=self.request.user, is_active=True)
-        serializer.save(cart=cart)
+        with transaction.atomic():
+            cart, _ = Cart.objects.select_for_update().get_or_create(user=self.request.user, is_active=True)
+            serializer.save(cart=cart)
 
 
 class AnalyticsSummaryView(APIView):
@@ -181,7 +223,7 @@ class AnalyticsSummaryView(APIView):
                     .order_by('-quantity')[:10]
                 ),
                 'orders_over_time': list(
-                    Order.objects.extra({'date': "date(created_at)"})
+                    Order.objects.annotate(date=TruncDate('created_at'))
                     .values('date')
                     .annotate(total=Count('id'), revenue=Sum('grand_total'))
                     .order_by('date')[:30]

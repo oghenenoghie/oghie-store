@@ -17,6 +17,13 @@ class Payment(models.Model):
         null=True,
         blank=True,
     )
+    order = models.ForeignKey(
+        'orders.Order',
+        on_delete=models.SET_NULL,
+        related_name='payments',
+        null=True,
+        blank=True,
+    )
     provider = models.CharField(max_length=80)
     provider_reference = models.CharField(max_length=255, blank=True, unique=True)
     amount = models.DecimalField(max_digits=10, decimal_places=2)
