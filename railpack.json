@@ -1,5 +1,5 @@
 {
   "deploy": {
-    "startCommand": "gunicorn oghie.wsgi:application --chdir oghie"
+    "startCommand": "gunicorn oghie.wsgi:application"
   }
 }
