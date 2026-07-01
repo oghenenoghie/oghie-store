@@ -52,9 +52,12 @@ class ProductImageSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'created_at']
 
     def get_image_url(self, obj):
-        if obj.image:
-            return obj.image.url
-        return None
+        if not obj.image:
+            return None
+        name = obj.image.name
+        if name.startswith('http://') or name.startswith('https://'):
+            return name
+        return obj.image.url
 
 
 class ProductSerializer(serializers.ModelSerializer):
