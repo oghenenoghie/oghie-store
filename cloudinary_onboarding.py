@@ -12,13 +12,13 @@ def _patched_ctx(*args, **kwargs):
     return _orig_ctx(*args, **kwargs)
 ssl.create_default_context = _patched_ctx
 
-# Configure Cloudinary with your credentials
-cloudinary.config(
-    cloud_name="***REMOVED-CLOUDINARY-CLOUD-NAME***",
-    api_key="***REMOVED-CLOUDINARY-API-KEY***",
-    api_secret="***REMOVED-CLOUDINARY-API-SECRET***",
-    secure=True,
-)
+# Configure Cloudinary from CLOUDINARY_URL (or CLOUDINARY_CLOUD_NAME/API_KEY/API_SECRET) env vars
+cloudinary.config(secure=True)
+if not cloudinary.config().cloud_name:
+    raise SystemExit(
+        "Cloudinary is not configured. Set the CLOUDINARY_URL environment variable "
+        "(cloudinary://<api_key>:<api_secret>@<cloud_name>) before running this script."
+    )
 
 # 1. Upload a sample image
 print("Uploading image...")
