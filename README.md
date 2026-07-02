@@ -69,6 +69,10 @@ DATABASE_URL=postgres://user:password@localhost:5432/oghie_store
 CLOUDINARY_URL=cloudinary://<api_key>:<api_secret>@<cloud_name>
 ```
 
+`DJANGO_DEBUG` defaults to `False` if unset, so set it explicitly to `True` for local development.
+
+`DATABASE_URL` falls back to a local sqlite file when unset, but only for local development — **on Vercel, `DATABASE_URL` is required.** The deployment filesystem is read-only outside `/tmp`, so without a real Postgres `DATABASE_URL` the app cannot write sessions, admin changes, orders, etc. Set it in the Vercel project's environment variables to your Postgres connection string.
+
 ## Testing
 
 ```bash

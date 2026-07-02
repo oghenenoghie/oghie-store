@@ -30,7 +30,7 @@ SECRET_KEY = 'django-insecure-3!lk4on_*gy8um34369tlcf#)-fs9a9^nz!moq%=k)hy*9q=yj
 # SECURITY WARNING: don't run with debug turned on in production!
 SECRET_KEY = os.environ.get('SECRET_KEY', SECRET_KEY)
 
-DEBUG = os.environ.get('DJANGO_DEBUG', 'True') == 'True'
+DEBUG = os.environ.get('DJANGO_DEBUG', 'False') == 'True'
 
 ALLOWED_HOSTS = ['127.0.0.1', 'localhost', '.vercel.app', '.now.sh']
 
@@ -273,6 +273,19 @@ WSGI_APPLICATION = 'oghie.wsgi.application'
 
 # Database
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
+
+# Vercel's Lambda filesystem is read-only outside /tmp, so the bundled
+# sqlite fallback below can only ever be used for local development -
+# on Vercel it must be backed by DATABASE_URL (Postgres) or every write
+# (including session creation on login) fails with "readonly database".
+if os.environ.get('VERCEL') and not os.environ.get('DATABASE_URL'):
+    from django.core.exceptions import ImproperlyConfigured
+    raise ImproperlyConfigured(
+        'DATABASE_URL is not set. On Vercel the app cannot fall back to the '
+        'bundled sqlite file because the deployment filesystem is read-only. '
+        'Set DATABASE_URL to a Postgres connection string in the Vercel '
+        'project environment variables.'
+    )
 
 DATABASES = {
     'default': dj_database_url.config(
