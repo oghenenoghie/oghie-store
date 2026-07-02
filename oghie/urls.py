@@ -33,6 +33,7 @@ admin.site.index_title = 'Dashboard'
 def api_root(request):
     return JsonResponse({
         'admin': '/admin/',
+        'register': '/api/auth/register/',
         'token': '/api/auth/token/',
         'token_refresh': '/api/auth/token/refresh/',
         'current_user': '/api/auth/me/',

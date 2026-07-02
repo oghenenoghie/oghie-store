@@ -1,11 +1,12 @@
 from rest_framework import filters, viewsets
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework_simplejwt.tokens import RefreshToken
 
 from .models import UserProfile
 from .permissions import IsSuperAdmin
-from .serializers import UserProfileSerializer, UserSerializer
+from .serializers import RegisterSerializer, UserProfileSerializer, UserSerializer
 
 
 class CurrentUserView(APIView):
@@ -13,6 +14,24 @@ class CurrentUserView(APIView):
 
     def get(self, request):
         return Response(UserSerializer(request.user).data)
+
+
+class RegisterView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        serializer = RegisterSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        user = serializer.save()
+        refresh = RefreshToken.for_user(user)
+        return Response(
+            {
+                'user': UserSerializer(user).data,
+                'refresh': str(refresh),
+                'access': str(refresh.access_token),
+            },
+            status=201,
+        )
 
 
 class UserProfileViewSet(viewsets.ModelViewSet):
