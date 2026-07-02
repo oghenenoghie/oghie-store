@@ -295,6 +295,14 @@ DATABASES = {
     )
 }
 
+# Supabase's session pooler (port 5432) caps concurrent clients (e.g. 15 on
+# the free tier) and is easily exhausted by serverless functions holding
+# persistent connections. DATABASE_URL should point at the transaction
+# pooler (port 6543) instead, which multiplexes many clients onto a small
+# backend pool - but that mode doesn't support server-side cursors.
+if DATABASES['default']['ENGINE'] == 'django.db.backends.postgresql':
+    DATABASES['default']['DISABLE_SERVER_SIDE_CURSORS'] = True
+
 
 # Password validation
 # https://docs.djangoproject.com/en/6.0/ref/settings/#auth-password-validators
