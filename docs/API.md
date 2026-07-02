@@ -16,10 +16,56 @@ Authorization: Bearer <access_token>
 
 | Method | Endpoint | Auth | Description |
 | --- | --- | --- | --- |
-| `POST` | `/api/auth/token/` | Public | Obtain access and refresh tokens. |
+| `POST` | `/api/auth/register/` | Public | Sign up: create a user account and return JWT tokens. |
+| `POST` | `/api/auth/token/` | Public | Sign in: obtain access and refresh tokens. |
 | `POST` | `/api/auth/token/refresh/` | Public | Refresh an access token. |
 | `POST` | `/api/auth/token/verify/` | Public | Verify a token. |
 | `GET` | `/api/auth/me/` | User | Return the current authenticated user. |
+
+### Register (Sign Up)
+
+Request:
+
+```json
+{
+  "username": "newcustomer",
+  "email": "newcustomer@example.com",
+  "password": "S3cure-Passw0rd!",
+  "phone": "+15551234567",
+  "address": "1 Market Street"
+}
+```
+
+`phone` and `address` are optional. New accounts are created with the `customer` role. Passwords are validated with Django's standard password validators (minimum length, not too common, not entirely numeric, not too similar to the username/email).
+
+Response (`201`):
+
+```json
+{
+  "user": {
+    "id": 1,
+    "username": "newcustomer",
+    "email": "newcustomer@example.com",
+    "is_staff": false,
+    "is_superuser": false,
+    "profile": {
+      "id": 1,
+      "user": 1,
+      "username": "newcustomer",
+      "email": "newcustomer@example.com",
+      "role": "customer",
+      "phone": "+15551234567",
+      "address": "1 Market Street",
+      "company_name": "",
+      "is_active": true,
+      "created_at": "2026-07-02T00:00:00Z",
+      "updated_at": "2026-07-02T00:00:00Z"
+    }
+  },
+  "refresh": "refresh.jwt.token",
+  "access": "access.jwt.token"
+}
+```
 
 ### Obtain Token
 
@@ -97,15 +143,15 @@ GET /api/products/?search=shirt&ordering=-price
 
 ### Product Endpoints
 
-Products use `slug` as the detail lookup value.
+Product detail routes accept either the `slug` or the numeric `id` as the lookup value.
 
 | Method | Endpoint | Auth | Description |
 | --- | --- | --- | --- |
 | `GET` | `/api/products/` | Public | List products. |
 | `POST` | `/api/products/` | Admin | Create a product. |
-| `GET` | `/api/products/{slug}/` | Public | Retrieve a product. |
-| `PUT/PATCH` | `/api/products/{slug}/` | Admin | Update a product. |
-| `DELETE` | `/api/products/{slug}/` | Admin | Delete a product. |
+| `GET` | `/api/products/{slug-or-id}/` | Public | Retrieve a product. |
+| `PUT/PATCH` | `/api/products/{slug-or-id}/` | Admin | Update a product. |
+| `DELETE` | `/api/products/{slug-or-id}/` | Admin | Delete a product. |
 
 Product filters:
 

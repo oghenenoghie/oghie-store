@@ -18,11 +18,13 @@ A Django REST Framework backend powering a headless ecommerce storefront: produc
 | Purpose | Method | Path |
 |---|---|---|
 | Admin | — | `/admin/` |
-| Get JWT token | `POST` | `/api/auth/token/` |
+| Sign up | `POST` | `/api/auth/register/` |
+| Get JWT token (sign in) | `POST` | `/api/auth/token/` |
 | Refresh JWT token | `POST` | `/api/auth/token/refresh/` |
 | Current user | `GET` | `/api/auth/me/` |
 | Product list | `GET` | `/api/products/` |
 | Product filters | `GET` | `/api/products/?search=&category=&currency=&min_price=&max_price=&in_stock=true&min_rating=&ordering=price` |
+| Product detail | `GET` | `/api/products/{slug-or-id}/` |
 | Currencies | `GET` | `/api/products/currencies/` |
 | Wishlist | `GET`/`POST` | `/api/products/wishlist/` |
 | Reviews | `GET`/`POST` | `/api/products/reviews/` |

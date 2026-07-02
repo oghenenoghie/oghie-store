@@ -1,3 +1,4 @@
+from django.shortcuts import get_object_or_404
 from rest_framework import filters, viewsets
 from rest_framework.permissions import IsAuthenticated, IsAuthenticatedOrReadOnly
 
@@ -43,6 +44,14 @@ class ProductViewSet(viewsets.ModelViewSet):
     search_fields = ['name', 'description', 'category__name']
     ordering_fields = ['name', 'price', 'stock_quantity', 'created_at', 'updated_at']
     ordering = ['name']
+
+    def get_object(self):
+        queryset = self.filter_queryset(self.get_queryset())
+        lookup_value = self.kwargs[self.lookup_url_kwarg or self.lookup_field]
+        filter_kwargs = {'pk': lookup_value} if lookup_value.isdigit() else {'slug': lookup_value}
+        obj = get_object_or_404(queryset, **filter_kwargs)
+        self.check_object_permissions(self.request, obj)
+        return obj
 
     def get_queryset(self):
         queryset = super().get_queryset()
