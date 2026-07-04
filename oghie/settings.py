@@ -293,10 +293,18 @@ if os.environ.get('VERCEL') and not os.environ.get('DATABASE_URL'):
         'project environment variables.'
     )
 
+# Each Vercel invocation is a separate, short-lived function instance, so a
+# persistent connection (conn_max_age > 0) just sits open for its full
+# lifetime after the request ends instead of being reused - and with many
+# concurrent invocations that's what was exhausting Supabase's session
+# pooler ("max clients reached in session mode - max clients are limited to
+# pool_size: 15"), taking down /api/products/ and every other DB-backed
+# route. Locally there's one long-running process, so persistent
+# connections are safe and worth keeping.
 DATABASES = {
     'default': dj_database_url.config(
         default=f"sqlite:///{BASE_DIR / 'db.sqlite3'}",
-        conn_max_age=600,
+        conn_max_age=0 if os.environ.get('VERCEL') else 600,
         conn_health_checks=True,
     )
 }
