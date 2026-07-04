@@ -1,6 +1,21 @@
 from django.core.validators import FileExtensionValidator
 from django.db import models
 
+ALLOWED_IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'webp']
+_image_extension_validator = FileExtensionValidator(ALLOWED_IMAGE_EXTENSIONS)
+
+
+def validate_image_upload_or_url(value):
+    """ProductImage.image sometimes holds an external URL instead of an
+    uploaded file (see ProductSerializer.get_image_url's matching check) -
+    those never have a recognizable file extension, so skip the upload
+    extension check for them instead of rejecting every save.
+    """
+    name = value.name if hasattr(value, 'name') else str(value)
+    if name.startswith('http://') or name.startswith('https://'):
+        return
+    _image_extension_validator(value)
+
 
 class Currency(models.Model):
     code = models.CharField(max_length=3, unique=True)
@@ -89,7 +104,8 @@ class ProductImage(models.Model):
     )
     image = models.ImageField(
         upload_to='products/',
-        validators=[FileExtensionValidator(['jpg', 'jpeg', 'png', 'webp'])],
+        max_length=500,
+        validators=[validate_image_upload_or_url],
     )
     alt_text = models.CharField(max_length=255, blank=True)
     is_primary = models.BooleanField(default=False)
