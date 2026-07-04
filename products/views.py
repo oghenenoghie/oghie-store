@@ -1,3 +1,4 @@
+from django.db.models import Q
 from rest_framework import filters, viewsets
 from rest_framework.permissions import IsAuthenticated, IsAuthenticatedOrReadOnly
 
@@ -56,7 +57,13 @@ class ProductViewSet(viewsets.ModelViewSet):
         min_rating = self.request.query_params.get('min_rating')
 
         if category:
-            queryset = queryset.filter(category__slug=category)
+            # Category is a flat parent/child tree (one level deep in
+            # practice), so a parent slug like "women" should also surface
+            # products filed under its subcategories (e.g. "women-outerwear")
+            # instead of only exact matches.
+            queryset = queryset.filter(
+                Q(category__slug=category) | Q(category__parent__slug=category)
+            )
         if vendor:
             queryset = queryset.filter(vendor_id=vendor)
         if currency:
