@@ -38,6 +38,12 @@ CORS_ALLOWED_ORIGINS = [
     'https://oghie-store-front.vercel.app',
     'https://oghie-kwd-store.vercel.app',
 ]
+# Vercel gives every branch/PR preview of the frontend its own subdomain
+# (oghie-kwd-store-<hash>... / oghie-kwd-store-git-<branch>...), so an
+# exact-match allowlist alone blocks every preview deployment.
+CORS_ALLOWED_ORIGIN_REGEXES = [
+    r'^https://oghie-kwd-store(-[\w-]+)?\.vercel\.app$',
+]
 CORS_ALLOW_CREDENTIALS = True
 
 CSRF_TRUSTED_ORIGINS = [
