@@ -7,7 +7,6 @@ os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'oghie.settings')
 django.setup()
 
 from django.core.management import call_command
-call_command('migrate', '--no-input', verbosity=0)
 call_command('collectstatic', '--no-input', verbosity=0)
 
 # WhiteNoiseMiddleware snapshots STATIC_ROOT when the WSGI app is built, so
