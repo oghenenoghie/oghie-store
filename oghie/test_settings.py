@@ -28,3 +28,38 @@ class ServerlessConnectionPoolingTests(SimpleTestCase):
             os.environ.pop('VERCEL', None)
             importlib.reload(settings_module)
             self.assertEqual(settings_module.DATABASES['default']['CONN_MAX_AGE'], 600)
+
+
+class CloudinaryUrlConfigTests(SimpleTestCase):
+    """Guards against a malformed CLOUDINARY_URL crashing every request.
+
+    The cloudinary package parses CLOUDINARY_URL at import time and raises
+    ValueError for anything not starting with 'cloudinary://'. Since that
+    import happens during django.setup(), a bad value (e.g. one missing the
+    scheme) took down the entire site with a 500, including static assets.
+    """
+
+    def tearDown(self):
+        importlib.reload(settings_module)
+
+    def test_malformed_cloudinary_url_is_ignored(self):
+        with mock.patch.dict(os.environ, {'CLOUDINARY_URL': 'api_key:api_secret@cloud_name'}):
+            importlib.reload(settings_module)
+            self.assertNotIn('cloudinary', settings_module.INSTALLED_APPS)
+            self.assertNotIn('cloudinary_storage', settings_module.INSTALLED_APPS)
+
+    def test_wellformed_cloudinary_url_enables_cloudinary_storage(self):
+        with mock.patch.dict(os.environ, {'CLOUDINARY_URL': 'cloudinary://api_key:api_secret@cloud_name'}):
+            importlib.reload(settings_module)
+            self.assertIn('cloudinary', settings_module.INSTALLED_APPS)
+            self.assertIn('cloudinary_storage', settings_module.INSTALLED_APPS)
+            self.assertEqual(
+                settings_module.STORAGES['default']['BACKEND'],
+                'cloudinary_storage.storage.MediaCloudinaryStorage',
+            )
+
+    def test_missing_cloudinary_url_falls_back_to_default_storage(self):
+        with mock.patch.dict(os.environ, {}, clear=False):
+            os.environ.pop('CLOUDINARY_URL', None)
+            importlib.reload(settings_module)
+            self.assertNotIn('cloudinary', settings_module.INSTALLED_APPS)
