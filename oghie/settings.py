@@ -10,6 +10,7 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/6.0/ref/settings/
 """
 
+import logging
 import os
 from pathlib import Path
 
@@ -363,13 +364,25 @@ FILE_UPLOAD_MAX_MEMORY_SIZE = 5 * 1024 * 1024
 DATA_UPLOAD_MAX_MEMORY_SIZE = 5 * 1024 * 1024
 
 CLOUDINARY_URL = os.environ.get('CLOUDINARY_URL')
-if CLOUDINARY_URL:
+if CLOUDINARY_URL and CLOUDINARY_URL.startswith('cloudinary://'):
     INSTALLED_APPS += ['cloudinary_storage', 'cloudinary']
     DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
     STORAGES = {
         'default': {'BACKEND': 'cloudinary_storage.storage.MediaCloudinaryStorage'},
         'staticfiles': {'BACKEND': 'whitenoise.storage.CompressedStaticFilesStorage'},
     }
+elif CLOUDINARY_URL:
+    # The cloudinary package parses CLOUDINARY_URL at import time and raises
+    # ValueError for anything not starting with 'cloudinary://', which would
+    # otherwise crash every request (including static assets) via
+    # django.setup() -> AppConfig.create('cloudinary'). Skip enabling it
+    # instead so a misconfigured env var degrades to local media storage
+    # rather than taking down the whole site.
+    logging.getLogger(__name__).warning(
+        "CLOUDINARY_URL is set but does not start with 'cloudinary://' "
+        "(expected cloudinary://<api_key>:<api_secret>@<cloud_name>); "
+        "ignoring it and falling back to local media storage."
+    )
 
 SECURE_CONTENT_TYPE_NOSNIFF = True
 X_FRAME_OPTIONS = 'DENY'
