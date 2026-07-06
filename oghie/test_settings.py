@@ -30,6 +30,37 @@ class ServerlessConnectionPoolingTests(SimpleTestCase):
             self.assertEqual(settings_module.DATABASES['default']['CONN_MAX_AGE'], 600)
 
 
+class SupabasePoolerPortTests(SimpleTestCase):
+    """Guards against silently regressing to Supabase's session pooler.
+
+    Production intermittently 500'd across /api/products/, register, login,
+    and the admin with "max clients reached in session mode" because
+    DATABASE_URL pointed at Supabase's session pooler (port 5432, capped at
+    15 concurrent clients) instead of the transaction pooler (port 6543).
+    """
+
+    def tearDown(self):
+        importlib.reload(settings_module)
+
+    def test_supabase_session_pooler_port_is_rewritten_to_transaction_pooler(self):
+        url = 'postgres://user:pass@aws-1-ap-southeast-2.pooler.supabase.com:5432/postgres'
+        with mock.patch.dict(os.environ, {'DATABASE_URL': url}):
+            importlib.reload(settings_module)
+            self.assertEqual(settings_module.DATABASES['default']['PORT'], 6543)
+
+    def test_transaction_pooler_port_is_left_alone(self):
+        url = 'postgres://user:pass@aws-1-ap-southeast-2.pooler.supabase.com:6543/postgres'
+        with mock.patch.dict(os.environ, {'DATABASE_URL': url}):
+            importlib.reload(settings_module)
+            self.assertEqual(settings_module.DATABASES['default']['PORT'], 6543)
+
+    def test_non_supabase_postgres_host_on_5432_is_left_alone(self):
+        url = 'postgres://user:pass@localhost:5432/postgres'
+        with mock.patch.dict(os.environ, {'DATABASE_URL': url}):
+            importlib.reload(settings_module)
+            self.assertEqual(settings_module.DATABASES['default']['PORT'], 5432)
+
+
 class CloudinaryUrlConfigTests(SimpleTestCase):
     """Guards against a malformed CLOUDINARY_URL crashing every request.
 

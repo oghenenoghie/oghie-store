@@ -319,6 +319,20 @@ DATABASES = {
 if DATABASES['default']['ENGINE'] == 'django.db.backends.postgresql':
     DATABASES['default']['DISABLE_SERVER_SIDE_CURSORS'] = True
 
+    # Belt-and-braces: this is exactly what took down /api/products/,
+    # /api/auth/register/, /api/auth/token/, and the admin in production
+    # ("max clients reached in session mode") - the configured DATABASE_URL
+    # was still pointing at the session pooler's port 5432 rather than the
+    # transaction pooler's 6543 despite the guidance above. Rather than
+    # depend on that env var being set correctly by hand (and staying that
+    # way), rewrite it here so a Supabase pooler host on 5432 can't
+    # silently regress this again.
+    if (
+        DATABASES['default'].get('HOST', '').endswith('pooler.supabase.com')
+        and DATABASES['default'].get('PORT') == 5432
+    ):
+        DATABASES['default']['PORT'] = 6543
+
 
 # Password validation
 # https://docs.djangoproject.com/en/6.0/ref/settings/#auth-password-validators
