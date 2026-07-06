@@ -19,6 +19,12 @@ from django.conf import settings
 from django.conf.urls.static import static
 from django.http import JsonResponse
 from django.urls import include, path
+from drf_spectacular.views import (
+    SpectacularAPIView,
+    SpectacularRedocView,
+    SpectacularSwaggerView,
+)
+from rest_framework.permissions import AllowAny
 from rest_framework_simplejwt.views import (
     TokenObtainPairView,
     TokenRefreshView,
@@ -32,6 +38,9 @@ admin.site.index_title = 'Dashboard'
 
 def api_root(request):
     return JsonResponse({
+        'docs': '/',
+        'redoc': '/api/docs/redoc/',
+        'schema': '/api/schema/',
         'admin': '/admin/',
         'register': '/api/auth/register/',
         'token': '/api/auth/token/',
@@ -54,7 +63,10 @@ def api_root(request):
 
 
 urlpatterns = [
-    path('', api_root, name='api-root'),
+    path('', SpectacularSwaggerView.as_view(url_name='schema', permission_classes=[AllowAny]), name='swagger-ui'),
+    path('api/', api_root, name='api-root'),
+    path('api/schema/', SpectacularAPIView.as_view(permission_classes=[AllowAny]), name='schema'),
+    path('api/docs/redoc/', SpectacularRedocView.as_view(url_name='schema', permission_classes=[AllowAny]), name='redoc'),
     path('admin/', admin.site.urls),
     path('api/auth/token/', TokenObtainPairView.as_view(), name='token-obtain-pair'),
     path('api/auth/token/refresh/', TokenRefreshView.as_view(), name='token-refresh'),
