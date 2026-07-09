@@ -1,6 +1,10 @@
 from django.core.exceptions import ValidationError
+from django.core.management import call_command
+from django.test import TestCase
 from rest_framework import status
 from rest_framework.test import APITestCase
+
+from cms.models import CMSSection
 
 from .models import Category, Currency, Product, ProductImage, validate_image_upload_or_url
 
@@ -85,3 +89,40 @@ class _FakeFile:
 
     def __init__(self, name):
         self.name = name
+
+
+class SeedDemoDataTests(TestCase):
+    # Regression guard: seed_demo_data used to generate solid-color PNG
+    # squares as product/hero images instead of real photos. Confirms the
+    # command now seeds a multi-slide hero carousel and gives every demo
+    # product real (http) image URLs instead of a placeholder file.
+    def test_seeds_multiple_ordered_hero_slides(self):
+        call_command('seed_demo_data')
+
+        heroes = list(
+            CMSSection.objects.filter(section_type=CMSSection.SectionType.HERO).order_by('sort_order')
+        )
+
+        self.assertGreaterEqual(len(heroes), 2)
+        self.assertEqual([h.sort_order for h in heroes], sorted(h.sort_order for h in heroes))
+        for hero in heroes:
+            self.assertTrue(hero.is_active)
+            self.assertTrue(hero.image.name.startswith('https://'))
+
+    def test_seeds_products_with_real_image_urls(self):
+        call_command('seed_demo_data')
+
+        product = Product.objects.filter(slug__startswith='demo-').first()
+        self.assertIsNotNone(product)
+
+        images = list(product.images.all())
+        self.assertEqual(len(images), 2)
+        for image in images:
+            self.assertTrue(image.image.name.startswith('https://'))
+
+    def test_running_twice_does_not_duplicate_hero_slides(self):
+        call_command('seed_demo_data')
+        call_command('seed_demo_data')
+
+        hero_count = CMSSection.objects.filter(section_type=CMSSection.SectionType.HERO).count()
+        self.assertEqual(hero_count, 4)
