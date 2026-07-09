@@ -1,10 +1,8 @@
-import io
 import random
 from datetime import timedelta
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import User
-from django.core.files.base import ContentFile
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 
@@ -14,11 +12,32 @@ from payments.models import Payment
 from products.models import Category, Currency, Product, ProductImage, ProductReview, WishlistItem
 from users.models import UserProfile
 
-try:
-    from PIL import Image
-except ImportError:
-    Image = None
+# ProductImage.image and CMSSection.image both accept a plain external URL in
+# place of an uploaded file (see products/models.py:validate_image_upload_or_url
+# and the matching image_url passthrough in products/serializers.py and
+# cms/serializers.py) - so seed images are just real photo URLs rather than
+# files this command has to fetch and store itself. Picsum Photos serves real
+# stock photography (not solid placeholder squares) at a stable, deterministic
+# URL per seed string, which keeps this command's output reproducible without
+# needing outbound network access from wherever it's run.
+def _picsum_url(seed, width=800, height=800):
+    return f'https://picsum.photos/seed/{seed}/{width}/{height}'
 
+
+HERO_SLIDES = [
+    ('demo-hero-new-season', 'Quiet luxury, considered detail.',
+     'Tailoring and accessories built for permanence, not trend cycles.',
+     'oghie-hero-tailoring', '/products?ordering=-created', 1),
+    ('demo-hero-outerwear', 'Outerwear for the long season.',
+     'Weather-ready silhouettes cut from responsibly sourced wool and cotton.',
+     'oghie-hero-outerwear', '/products?category=apparel', 2),
+    ('demo-hero-accessories', 'Small goods, built to last.',
+     'Leather bags, belts, and wallets finished by hand.',
+     'oghie-hero-accessories', '/products?category=accessories', 3),
+    ('demo-hero-footwear', 'Sneakers for every mile.',
+     'Everyday and performance styles engineered for comfort.',
+     'oghie-hero-footwear', '/products?category=sneakers', 4),
+]
 
 CATEGORIES = [
     ('Sneakers', 'Everyday and performance sneakers for every occasion.'),
@@ -50,11 +69,6 @@ CUSTOMERS = [
     ('customer_tunde', 'Tunde', 'Ade', 'tunde@oghiestore.test'),
     ('customer_grace', 'Grace', 'Udo', 'grace@oghiestore.test'),
     ('customer_kemi', 'Kemi', 'Fashola', 'kemi@oghiestore.test'),
-]
-
-COLORS = [
-    (232, 93, 4), (4, 141, 232), (34, 139, 87), (176, 38, 255),
-    (232, 4, 62), (255, 176, 0), (0, 168, 168), (120, 120, 120),
 ]
 
 
@@ -121,15 +135,6 @@ class Command(BaseCommand):
             users.append(user)
         return users
 
-    def _placeholder_image(self, label):
-        if Image is None:
-            return None
-        color = random.choice(COLORS)
-        img = Image.new('RGB', (600, 600), color=color)
-        buf = io.BytesIO()
-        img.save(buf, format='PNG')
-        return ContentFile(buf.getvalue(), name=f'{label}.png')
-
     def _seed_categories(self):
         categories = {}
         for i, (name, description) in enumerate(CATEGORIES):
@@ -170,12 +175,9 @@ class Command(BaseCommand):
                 )
                 if created:
                     for i in range(2):
-                        image_file = self._placeholder_image(f'{slug}-{i}')
-                        if image_file is None:
-                            continue
                         ProductImage.objects.create(
                             product=product,
-                            image=image_file,
+                            image=_picsum_url(f'{slug}-{i}'),
                             alt_text=f'{name} view {i + 1}',
                             is_primary=(i == 0),
                         )
@@ -214,27 +216,44 @@ class Command(BaseCommand):
                 WishlistItem.objects.get_or_create(user=customer, product=product)
 
     def _seed_cms_sections(self, products):
+        # The homepage hero renders every active HERO section as one slide in
+        # a carousel (ordered by sort_order), so seeding several of these -
+        # instead of a single demo-hero-main row - is what actually turns it
+        # into a carousel rather than a static banner.
+        for slug, title, body, image_seed, link_url, order in HERO_SLIDES:
+            CMSSection.objects.get_or_create(
+                slug=slug,
+                defaults={
+                    'title': title,
+                    'section_type': CMSSection.SectionType.HERO,
+                    'body': body,
+                    'image': _picsum_url(image_seed, width=1600, height=900),
+                    'link_url': link_url,
+                    'sort_order': order,
+                    'is_active': True,
+                },
+            )
+
         sections = [
-            ('demo-hero-main', 'Summer Refresh Is Here', CMSSection.SectionType.HERO,
-             'Discover new arrivals across sneakers, apparel, and accessories.', 1),
             ('demo-banner-sale', '20% Off Sitewide This Week', CMSSection.SectionType.BANNER,
-             'Use code DEMOSAVE20 at checkout.', 2),
+             'Use code DEMOSAVE20 at checkout.', 'oghie-banner-sale', 10),
             ('demo-featured', 'Featured Products', CMSSection.SectionType.FEATURED_PRODUCTS,
-             'Hand-picked favorites from our vendors.', 3),
+             'Hand-picked favorites from our vendors.', None, 11),
             ('demo-content-about', 'About Oghie Store', CMSSection.SectionType.CONTENT,
-             'Oghie Store connects independent vendors with customers across Nigeria and beyond.', 4),
+             'Oghie Store connects independent vendors with customers across Nigeria and beyond.', None, 12),
             ('demo-content-shipping', 'Shipping & Returns', CMSSection.SectionType.CONTENT,
-             'Free shipping on orders over $50. Returns accepted within 30 days.', 5),
+             'Free shipping on orders over $50. Returns accepted within 30 days.', None, 13),
             ('demo-footer-main', 'Store Footer', CMSSection.SectionType.FOOTER,
-             'Oghie Store — quality goods from trusted vendors.', 6),
+             'Oghie Store — quality goods from trusted vendors.', None, 14),
         ]
-        for slug, title, section_type, body, order in sections:
+        for slug, title, section_type, body, image_seed, order in sections:
             CMSSection.objects.get_or_create(
                 slug=slug,
                 defaults={
                     'title': title,
                     'section_type': section_type,
                     'body': body,
+                    'image': _picsum_url(image_seed, width=1200, height=600) if image_seed else '',
                     'sort_order': order,
                     'is_active': True,
                 },
