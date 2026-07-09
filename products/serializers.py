@@ -91,7 +91,15 @@ class ProductSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ['id', 'created_at', 'updated_at']
 
+    # ProductViewSet.queryset annotates annotated_average_rating/
+    # annotated_review_count in the list query itself so these don't have to
+    # hit the DB per product; other call sites (e.g. WishlistItemSerializer's
+    # nested product_detail) don't annotate, so fall back to computing it
+    # live from `obj.reviews` there.
     def get_average_rating(self, obj):
+        if hasattr(obj, 'annotated_average_rating'):
+            rating = obj.annotated_average_rating
+            return round(rating, 2) if rating is not None else None
         approved_reviews = obj.reviews.filter(status=ProductReview.Status.APPROVED)
         if not approved_reviews.exists():
             return None
@@ -99,6 +107,8 @@ class ProductSerializer(serializers.ModelSerializer):
         return round(total / approved_reviews.count(), 2)
 
     def get_review_count(self, obj):
+        if hasattr(obj, 'annotated_review_count'):
+            return obj.annotated_review_count
         return obj.reviews.filter(status=ProductReview.Status.APPROVED).count()
 
 
