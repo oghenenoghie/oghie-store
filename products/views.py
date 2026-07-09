@@ -1,4 +1,4 @@
-from django.db.models import Q
+from django.db.models import Avg, Count, Q
 from rest_framework import filters, viewsets
 from rest_framework.permissions import IsAuthenticated, IsAuthenticatedOrReadOnly
 
@@ -36,7 +36,25 @@ class CategoryViewSet(viewsets.ModelViewSet):
 
 
 class ProductViewSet(viewsets.ModelViewSet):
-    queryset = Product.objects.select_related('category').prefetch_related('images')
+    # ProductSerializer.get_average_rating/get_review_count used to run their
+    # own `obj.reviews.filter(...)` queries per product (3-4 queries each,
+    # since get_average_rating re-evaluates the same filtered queryset three
+    # times) - with no pagination on this endpoint, listing N products meant
+    # roughly 4N extra round trips to the DB. Annotating the aggregate here
+    # computes both in the single list query instead; currency wasn't
+    # select_related either, adding one more query per row on top of that.
+    queryset = (
+        Product.objects.select_related('category', 'currency')
+        .prefetch_related('images')
+        .annotate(
+            annotated_average_rating=Avg(
+                'reviews__rating', filter=Q(reviews__status=ProductReview.Status.APPROVED)
+            ),
+            annotated_review_count=Count(
+                'reviews', filter=Q(reviews__status=ProductReview.Status.APPROVED)
+            ),
+        )
+    )
     serializer_class = ProductSerializer
     permission_classes = [IsAdminOrReadOnly]
     lookup_field = 'slug'

@@ -1,12 +1,15 @@
+from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.core.management import call_command
+from django.db import connection
 from django.test import TestCase
+from django.test.utils import CaptureQueriesContext
 from rest_framework import status
 from rest_framework.test import APITestCase
 
 from cms.models import CMSSection
 
-from .models import Category, Currency, Product, ProductImage, validate_image_upload_or_url
+from .models import Category, Currency, Product, ProductImage, ProductReview, validate_image_upload_or_url
 
 
 class ProductCategoryFilterTests(APITestCase):
@@ -46,6 +49,37 @@ class ProductCategoryFilterTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         slugs = {p['slug'] for p in response.data}
         self.assertEqual(slugs, {'coat'})
+
+
+class ProductListQueryCountTests(APITestCase):
+    # Regression guard: ProductSerializer.get_average_rating/get_review_count
+    # used to run their own `obj.reviews.filter(...)` queries per product
+    # (get_average_rating alone re-evaluated that filtered queryset three
+    # times), and currency wasn't select_related either - so listing N
+    # products fired roughly 4N+ extra queries against the DB. Over a
+    # serverless-to-Postgres network hop that turned a product list into a
+    # multi-second response. This pins the query count so it can't silently
+    # regress back to scaling with the number of products.
+    def test_listing_products_uses_a_fixed_number_of_queries(self):
+        currency = Currency.objects.get(code='USD')
+        category = Category.objects.create(name='Query Count', slug='query-count')
+        User = get_user_model()
+        for i in range(5):
+            product = Product.objects.create(
+                name=f'Product {i}', slug=f'product-{i}', description='d', price='10.00',
+                currency=currency, category=category, stock_quantity=5,
+            )
+            reviewer = User.objects.create_user(username=f'reviewer{i}', password='x')
+            ProductReview.objects.create(
+                product=product, user=reviewer, rating=5, status=ProductReview.Status.APPROVED,
+            )
+
+        with CaptureQueriesContext(connection) as ctx:
+            response = self.client.get('/api/products/')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 5)
+        self.assertLess(len(ctx.captured_queries), 10)
 
 
 class ProductImageValidationTests(APITestCase):
